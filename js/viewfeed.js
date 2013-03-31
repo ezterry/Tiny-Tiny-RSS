@@ -1833,7 +1833,18 @@ function initHeadlinesMenu() {
 			}}));
 
 		menu.addChild(new dijit.MenuSeparator());
-
+		menu.addChild(new dijit.MenuItem({
+			label: __("Toggle Read/Unread"),
+			onClick: function(event) {
+				var id = this.getParent().callerRowId;
+				var r=$("RROW-" + id);
+				if(r.hasClassName("Unread")){
+					toggleUnread(id,2,false);
+				} else{
+					toggleUnread(id,2,false);
+				}
+		}}));
+		menu.addChild(new dijit.MenuSeparator());
 		menu.addChild(new dijit.MenuItem({
 			label: __("Mark above as read"),
 			onClick: function(event) {
