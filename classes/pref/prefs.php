@@ -1,10 +1,61 @@
 <?php
+
 class Pref_Prefs extends Handler_Protected {
 
+	private $pref_help = array();
+	private $pref_sections = array();
+
 	function csrf_ignore($method) {
-		$csrf_ignored = array("index", "updateself");
+		$csrf_ignored = array("index", "updateself", "customizecss", "editprefprofiles");
 
 		return array_search($method, $csrf_ignored) !== false;
+	}
+
+	function __construct($link, $args) {
+		parent::__construct($link, $args);
+
+		$this->pref_sections = array(
+			1 => __('General'),
+			2 => __('Interface'),
+			3 => __('Advanced'),
+			4 => __('Digest')
+		);
+
+		$this->pref_help = array(
+			"ALLOW_DUPLICATE_POSTS" => array(__("Allow duplicate articles"), ""),
+			"AUTO_ASSIGN_LABELS" => array(__("Assign articles to labels automatically"), ""),
+			"BLACKLISTED_TAGS" => array(__("Blacklisted tags"), __("When auto-detecting tags in articles these tags will not be applied (comma-separated list).")),
+			"CDM_AUTO_CATCHUP" => array(__("Automatically mark articles as read"), __("This option enables marking articles as read automatically while you scroll article list.")),
+			"CDM_EXPANDED" => array(__("Automatically expand articles in combined mode"), ""),
+			"COMBINED_DISPLAY_MODE" => array(__("Combined feed display"), __("Display expanded list of feed articles, instead of separate displays for headlines and article content")),
+			"CONFIRM_FEED_CATCHUP" => array(__("Confirm marking feed as read"), ""),
+			"DEFAULT_ARTICLE_LIMIT" => array(__("Amount of articles to display at once"), ""),
+			"DEFAULT_UPDATE_INTERVAL" => array(__("Default interval between feed updates"), ""),
+			"DIGEST_CATCHUP" => array(__("Mark articles in e-mail digest as read"), ""),
+			"DIGEST_ENABLE" => array(__("Enable e-mail digest"), __("This option enables sending daily digest of new (and unread) headlines on your configured e-mail address")),
+			"DIGEST_PREFERRED_TIME" => array(__("Try to send digests around specified time"), __("Uses UTC timezone")),
+			"ENABLE_API_ACCESS" => array(__("Enable API access"), __("Allows external clients to access this account through the API")),
+			"ENABLE_FEED_CATS" => array(__("Enable feed categories"), ""),
+			"FEEDS_SORT_BY_UNREAD" => array(__("Sort feeds by unread articles count"), ""),
+			"FRESH_ARTICLE_MAX_AGE" => array(__("Maximum age of fresh articles (in hours)"), ""),
+			"HIDE_READ_FEEDS" => array(__("Hide feeds with no unread articles"), ""),
+			"HIDE_READ_SHOWS_SPECIAL" => array(__("Show special feeds when hiding read feeds"), ""),
+			"LONG_DATE_FORMAT" => array(__("Long date format"), ""),
+			"ON_CATCHUP_SHOW_NEXT_FEED" => array(__("On catchup show next feed"), __("Automatically open next feed with unread articles after marking one as read")),
+			"PURGE_OLD_DAYS" => array(__("Purge articles after this number of days (0 - disables)"), ""),
+			"PURGE_UNREAD_ARTICLES" => array(__("Purge unread articles"), ""),
+			"REVERSE_HEADLINES" => array(__("Reverse headline order (oldest first)"), ""),
+			"SHORT_DATE_FORMAT" => array(__("Short date format"), ""),
+			"SHOW_CONTENT_PREVIEW" => array(__("Show content preview in headlines list"), ""),
+			"SORT_HEADLINES_BY_FEED_DATE" => array(__("Sort headlines by feed date"), __("Use feed-specified date to sort headlines instead of local import date.")),
+			"SSL_CERT_SERIAL" => array(__("Login with an SSL certificate"), __("Click to register your SSL client certificate with tt-rss")),
+			"STRIP_IMAGES" => array(__("Do not embed images in articles"), ""),
+			"STRIP_UNSAFE_TAGS" => array(__("Strip unsafe tags from articles"), __("Strip all but most common HTML tags when reading articles.")),
+			"USER_STYLESHEET" => array(__("Customize stylesheet"), __("Customize CSS stylesheet to your liking")),
+			"USER_TIMEZONE" => array(__("User timezone"), ""),
+			"VFEED_GROUP_BY_FEED" => array(__("Group headlines in virtual feeds"), __("Special feeds, labels, and categories are grouped by originating feeds")),
+			"USER_CSS_THEME" => array(__("Select theme"), __("Select one of the available CSS themes"))
+		);
 	}
 
 	function changepassword() {
@@ -48,6 +99,8 @@ class Pref_Prefs extends Handler_Protected {
 			if (!isset($_POST[$pref])) $_POST[$pref] = 'false';
 		}
 
+		$need_reload = false;
+
 		foreach (array_keys($_POST) as $pref_name) {
 
 			$pref_name = db_escape_string($this->link, $pref_name);
@@ -62,11 +115,25 @@ class Pref_Prefs extends Handler_Protected {
 				}
 			}
 
-			set_pref($this->link, $pref_name, $value);
+			if ($pref_name == "language") {
+				if ($_SESSION["language"] != $value) {
+					setcookie("ttrss_lang", $value,
+						time() + SESSION_COOKIE_LIFETIME);
+					$_SESSION["language"] = $value;
+
+					$need_reload = true;
+				}
+			} else {
+				set_pref($this->link, $pref_name, $value);
+			}
 
 		}
 
-		print __("The configuration was saved.");
+		if ($need_reload) {
+			print "PREFS_NEED_RELOAD";
+		} else {
+			print __("The configuration was saved.");
+		}
 	}
 
 	function getHelp() {
@@ -114,15 +181,17 @@ class Pref_Prefs extends Handler_Protected {
 
 		initialize_user_prefs($this->link, $_SESSION["uid"], $_SESSION["profile"]);
 
-		print "PREFS_THEME_CHANGED";
+		echo __("Your preferences are now set to default values.");
 	}
 
 	function index() {
 
 		global $access_level_names;
 
-		$prefs_blacklist = array("HIDE_READ_FEEDS", "FEEDS_SORT_BY_UNREAD",
-					"STRIP_UNSAFE_TAGS");
+		$prefs_blacklist = array("STRIP_UNSAFE_TAGS", "REVERSE_HEADLINES",
+			"SORT_HEADLINES_BY_FEED_DATE", "DEFAULT_ARTICLE_LIMIT");
+
+		/* "FEEDS_SORT_BY_UNREAD", "HIDE_READ_FEEDS", "REVERSE_HEADLINES" */
 
 		$profile_blacklist = array("ALLOW_DUPLICATE_POSTS", "PURGE_OLD_DAYS",
 					"PURGE_UNREAD_ARTICLES", "DIGEST_ENABLE", "DIGEST_CATCHUP",
@@ -233,7 +302,7 @@ class Pref_Prefs extends Handler_Protected {
 			</script>";
 
 			if ($otp_enabled) {
-				print_notice("Changing your current password will disable OTP.");
+				print_notice(__("Changing your current password will disable OTP."));
 			}
 
 			print "<table width=\"100%\" class=\"prefPrefsList\">";
@@ -266,7 +335,7 @@ class Pref_Prefs extends Handler_Protected {
 
 				if ($otp_enabled) {
 
-					print_notice("One time passwords are currently enabled. Enter your current password below to disable.");
+					print_notice(__("One time passwords are currently enabled. Enter your current password below to disable."));
 
 					print "<form dojoType=\"dijit.form.Form\">";
 
@@ -378,8 +447,8 @@ class Pref_Prefs extends Handler_Protected {
 
 		print "<form dojoType=\"dijit.form.Form\" id=\"changeSettingsForm\">";
 
-		print "<script type=\"dojo/method\" event=\"onSubmit\" args=\"evt\">
-		evt.preventDefault();
+		print "<script type=\"dojo/method\" event=\"onSubmit\" args=\"evt, quit\">
+		if (evt) evt.preventDefault();
 		if (this.validate()) {
 			console.log(dojo.objectToQuery(this.getValues()));
 
@@ -387,10 +456,14 @@ class Pref_Prefs extends Handler_Protected {
 				parameters: dojo.objectToQuery(this.getValues()),
 				onComplete: function(transport) {
 					var msg = transport.responseText;
-					if (msg.match('PREFS_THEME_CHANGED')) {
-						window.location.reload();
+					if (quit) {
+						gotoMain();
 					} else {
-						notify_info(msg);
+						if (msg == 'PREFS_NEED_RELOAD') {
+							window.location.reload();
+						} else {
+							notify_info(msg);
+						}
 					}
 			} });
 		}
@@ -401,7 +474,7 @@ class Pref_Prefs extends Handler_Protected {
 		print '<div dojoType="dijit.layout.ContentPane" region="center" style="overflow-y : auto">';
 
 		if ($_SESSION["profile"]) {
-			print_notice("Some preferences are only available in default profile.");
+			print_notice(__("Some preferences are only available in default profile."));
 		}
 
 		if ($_SESSION["profile"]) {
@@ -412,24 +485,25 @@ class Pref_Prefs extends Handler_Protected {
 			$profile_qpart = "profile IS NULL";
 		}
 
-		if ($_SESSION["prefs_show_advanced"])
+		/* if ($_SESSION["prefs_show_advanced"])
 			$access_query = "true";
 		else
-			$access_query = "(access_level = 0 AND section_id != 3)";
+			$access_query = "(access_level = 0 AND section_id != 3)"; */
+
+		$access_query = 'true';
 
 		$result = db_query($this->link, "SELECT DISTINCT
-			ttrss_user_prefs.pref_name,short_desc,help_text,value,type_name,
+			ttrss_user_prefs.pref_name,value,type_name,
 			ttrss_prefs_sections.order_id,
-			section_name,def_value,section_id
+			def_value,section_id
 			FROM ttrss_prefs,ttrss_prefs_types,ttrss_prefs_sections,ttrss_user_prefs
 			WHERE type_id = ttrss_prefs_types.id AND
 				$profile_qpart AND
 				section_id = ttrss_prefs_sections.id AND
 				ttrss_user_prefs.pref_name = ttrss_prefs.pref_name AND
 				$access_query AND
-				short_desc != '' AND
 				owner_uid = ".$_SESSION["uid"]."
-			ORDER BY ttrss_prefs_sections.order_id,short_desc");
+			ORDER BY ttrss_prefs_sections.order_id,pref_name");
 
 		$lnum = 0;
 
@@ -443,12 +517,22 @@ class Pref_Prefs extends Handler_Protected {
 				continue;
 			}
 
+			$type_name = $line["type_name"];
+			$pref_name = $line["pref_name"];
+			$section_name = $this->getSectionName($line["section_id"]);
+			$value = $line["value"];
+
+			$short_desc = $this->getShortDesc($pref_name);
+			$help_text = $this->getHelpText($pref_name);
+
+			if (!$short_desc) continue;
+
 			if ($_SESSION["profile"] && in_array($line["pref_name"],
 					$profile_blacklist)) {
 				continue;
 			}
 
-			if ($active_section != $line["section_name"]) {
+			if ($active_section != $line["section_id"]) {
 
 				if ($active_section != "") {
 					print "</table>";
@@ -456,24 +540,34 @@ class Pref_Prefs extends Handler_Protected {
 
 				print "<table width=\"100%\" class=\"prefPrefsList\">";
 
-				$active_section = $line["section_name"];
+				$active_section = $line["section_id"];
 
-				print "<tr><td colspan=\"3\"><h3>".__($active_section)."</h3></td></tr>";
+				print "<tr><td colspan=\"3\"><h3>".$section_name."</h3></td></tr>";
 
 				$lnum = 0;
+
+				if ($active_section == 2) {
+					print "<tr>";
+
+					print "<td width=\"40%\" class=\"prefName\">";
+					print "<label>";
+					print __("Language:");
+					print "</label>";
+
+					print "<td>";
+					print_select_hash("language", $_COOKIE["ttrss_lang"], get_translations(),
+						"style='width : 220px; margin : 0px' dojoType='dijit.form.Select'");
+					print "</td>";
+					print "</tr>";
+				}
+
 			}
 
 			print "<tr>";
 
-			$type_name = $line["type_name"];
-			$pref_name = $line["pref_name"];
-			$value = $line["value"];
-			$def_value = $line["def_value"];
-			$help_text = $line["help_text"];
-
 			print "<td width=\"40%\" class=\"prefName\" id=\"$pref_name\">";
 			print "<label for='CB_$pref_name'>";
-			print __($line["short_desc"]);
+			print $short_desc;
 			print "</label>";
 
 			if ($help_text) print "<div class=\"prefHelp\">".__($help_text)."</div>";
@@ -492,12 +586,13 @@ class Pref_Prefs extends Handler_Protected {
 				print "<button dojoType=\"dijit.form.Button\"
 					onclick=\"customizeCSS()\">" . __('Customize') . "</button>";
 
-			} else if ($pref_name == "DEFAULT_ARTICLE_LIMIT") {
+			} else if ($pref_name == "USER_CSS_THEME") {
 
-				$limits = array(15, 30, 45, 60);
+				$themes = array_map("basename", glob("themes/*.css"));
 
-				print_select($pref_name, $value, $limits,
+				print_select($pref_name, $value, $themes,
 					'dojoType="dijit.form.Select"');
+
 
 			} else if ($pref_name == "DEFAULT_UPDATE_INTERVAL") {
 
@@ -522,7 +617,7 @@ class Pref_Prefs extends Handler_Protected {
 				print "<input type='checkbox' name='$pref_name' $checked $disabled
 					dojoType='dijit.form.CheckBox' id='CB_$pref_name' value='1'>";
 
-			} else if (array_search($pref_name, array('FRESH_ARTICLE_MAX_AGE', 'DEFAULT_ARTICLE_LIMIT',
+			} else if (array_search($pref_name, array('FRESH_ARTICLE_MAX_AGE',
 					'PURGE_OLD_DAYS', 'LONG_DATE_FORMAT', 'SHORT_DATE_FORMAT')) !== false) {
 
 				$regexp = ($type_name == 'integer') ? 'regexp="^\d*$"' : '';
@@ -591,8 +686,14 @@ class Pref_Prefs extends Handler_Protected {
 		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"op\" value=\"pref-prefs\">";
 		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"method\" value=\"saveconfig\">";
 
-		print "<button dojoType=\"dijit.form.Button\" type=\"submit\">".
-			__('Save configuration')."</button> ";
+		print "<div dojoType=\"dijit.form.ComboButton\" type=\"submit\">
+			<span>".__('Save configuration')."</span>
+			<div dojoType=\"dijit.DropDownMenu\">
+				<div dojoType=\"dijit.MenuItem\"
+					onclick=\"dijit.byId('changeSettingsForm').onSubmit(null, true)\">".
+				__("Save and exit preferences")."</div>
+			</div>
+			</div>";
 
 		print "<button dojoType=\"dijit.form.Button\" onclick=\"return editProfiles()\">".
 			__('Manage profiles')."</button> ";
@@ -602,7 +703,7 @@ class Pref_Prefs extends Handler_Protected {
 
 		print "&nbsp;";
 
-		$checked = $_SESSION["prefs_show_advanced"] ? "checked='1'" : "";
+		/* $checked = $_SESSION["prefs_show_advanced"] ? "checked='1'" : "";
 
 		print "<input onclick='toggleAdvancedPrefs()'
 				id='prefs_show_advanced'
@@ -610,7 +711,7 @@ class Pref_Prefs extends Handler_Protected {
 				$checked
 				type=\"checkbox\"></input>
 				<label for='prefs_show_advanced'>" .
-				__("Show additional preferences") . "</label>";
+				__("Show additional preferences") . "</label>"; */
 
 		global $pluginhost;
 		$pluginhost->run_hooks($pluginhost::HOOK_PREFS_TAB_SECTION,
@@ -626,7 +727,9 @@ class Pref_Prefs extends Handler_Protected {
 
 		print "<h2>".__("Plugins")."</h2>";
 
-		print_notice("You will need to reload Tiny Tiny RSS for plugin changes to take effect.");
+		print "<p>" . __("You will need to reload Tiny Tiny RSS for plugin changes to take effect.") . "</p>";
+
+		print_notice(__("Download more plugins at tt-rss.org <a class=\"visibleLink\" target=\"_blank\" href=\"http://tt-rss.org/forum/viewforum.php?f=22\">forums</a> or <a target=\"_blank\" class=\"visibleLink\" href=\"http://tt-rss.org/wiki/Plugins\">wiki</a>."));
 
 		print "<form dojoType=\"dijit.form.Form\" id=\"changePluginsForm\">";
 
@@ -685,7 +788,12 @@ class Pref_Prefs extends Handler_Protected {
 						type=\"checkbox\"></td>";
 
 				print "<td>$name</td>";
-				print "<td>" . htmlspecialchars($about[1]) . "</td>";
+				print "<td>" . htmlspecialchars($about[1]);
+				if (@$about[4]) {
+					print " &mdash; <a target=\"_blank\" class=\"visibleLink\"
+						href=\"".htmlspecialchars($about[4])."\">".__("more info")."</a>";
+				}
+				print "</td>";
 				print "<td>" . htmlspecialchars(sprintf("%.2f", $about[0])) . "</td>";
 				print "<td>" . htmlspecialchars($about[2]) . "</td>";
 
@@ -737,7 +845,13 @@ class Pref_Prefs extends Handler_Protected {
 					type=\"checkbox\"></td>";
 
 				print "<td><label for='FPCHK-$name'>$name</label></td>";
-				print "<td><label for='FPCHK-$name'>" . htmlspecialchars($about[1]) . "</label></td>";
+				print "<td><label for='FPCHK-$name'>" . htmlspecialchars($about[1]) . "</label>";
+				if (@$about[4]) {
+					print " &mdash; <a target=\"_blank\" class=\"visibleLink\"
+						href=\"".htmlspecialchars($about[4])."\">".__("more info")."</a>";
+				}
+				print "</td>";
+
 				print "<td>" . htmlspecialchars(sprintf("%.2f", $about[0])) . "</td>";
 				print "<td>" . htmlspecialchars($about[2]) . "</td>";
 
@@ -850,6 +964,171 @@ class Pref_Prefs extends Handler_Protected {
 
 		global $pluginhost;
 		$pluginhost->clear_data($pluginhost->get_plugin($name));
+	}
+
+	function customizeCSS() {
+		$value = get_pref($this->link, "USER_STYLESHEET");
+
+		$value = str_replace("<br/>", "\n", $value);
+
+		print_notice(T_sprintf("You can override colors, fonts and layout of your currently selected theme with custom CSS declarations here. <a target=\"_blank\" class=\"visibleLink\" href=\"%s\">This file</a> can be used as a baseline.", "tt-rss.css"));
+
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"op\" value=\"rpc\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"method\" value=\"setpref\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"key\" value=\"USER_STYLESHEET\">";
+
+		print "<table width='100%'><tr><td>";
+		print "<textarea dojoType=\"dijit.form.SimpleTextarea\"
+			style='font-size : 12px; width : 100%; height: 200px;'
+			placeHolder='body#ttrssMain { font-size : 14px; };'
+			name='value'>$value</textarea>";
+		print "</td></tr></table>";
+
+		print "<div class='dlgButtons'>";
+		print "<button dojoType=\"dijit.form.Button\"
+			onclick=\"dijit.byId('cssEditDlg').execute()\">".__('Save')."</button> ";
+		print "<button dojoType=\"dijit.form.Button\"
+			onclick=\"dijit.byId('cssEditDlg').hide()\">".__('Cancel')."</button>";
+		print "</div>";
+
+	}
+
+	function editPrefProfiles() {
+		print "<div dojoType=\"dijit.Toolbar\">";
+
+		print "<div dojoType=\"dijit.form.DropDownButton\">".
+				"<span>" . __('Select')."</span>";
+		print "<div dojoType=\"dijit.Menu\" style=\"display: none;\">";
+		print "<div onclick=\"selectTableRows('prefFeedProfileList', 'all')\"
+			dojoType=\"dijit.MenuItem\">".__('All')."</div>";
+		print "<div onclick=\"selectTableRows('prefFeedProfileList', 'none')\"
+			dojoType=\"dijit.MenuItem\">".__('None')."</div>";
+		print "</div></div>";
+
+		print "<div style=\"float : right\">";
+
+		print "<input name=\"newprofile\" dojoType=\"dijit.form.ValidationTextBox\"
+				required=\"1\">
+			<button dojoType=\"dijit.form.Button\"
+			onclick=\"dijit.byId('profileEditDlg').addProfile()\">".
+				__('Create profile')."</button></div>";
+
+		print "</div>";
+
+		$result = db_query($this->link, "SELECT title,id FROM ttrss_settings_profiles
+			WHERE owner_uid = ".$_SESSION["uid"]." ORDER BY title");
+
+		print "<div class=\"prefProfileHolder\">";
+
+		print "<form id=\"profile_edit_form\" onsubmit=\"return false\">";
+
+		print "<table width=\"100%\" class=\"prefFeedProfileList\"
+			cellspacing=\"0\" id=\"prefFeedProfileList\">";
+
+		print "<tr class=\"placeholder\" id=\"FCATR-0\">"; #odd
+
+		print "<td width='5%' align='center'><input
+			id='FCATC-0'
+			onclick='toggleSelectRow2(this);'
+			dojoType=\"dijit.form.CheckBox\"
+			type=\"checkbox\"></td>";
+
+		if (!$_SESSION["profile"]) {
+			$is_active = __("(active)");
+		} else {
+			$is_active = "";
+		}
+
+		print "<td><span>" .
+			__("Default profile") . " $is_active</span></td>";
+
+		print "</tr>";
+
+		$lnum = 1;
+
+		while ($line = db_fetch_assoc($result)) {
+
+			$class = ($lnum % 2) ? "even" : "odd";
+
+			$profile_id = $line["id"];
+			$this_row_id = "id=\"FCATR-$profile_id\"";
+
+			print "<tr class=\"placeholder\" $this_row_id>";
+
+			$edit_title = htmlspecialchars($line["title"]);
+
+			print "<td width='5%' align='center'><input
+				onclick='toggleSelectRow2(this);'
+				id='FCATC-$profile_id'
+				dojoType=\"dijit.form.CheckBox\"
+				type=\"checkbox\"></td>";
+
+			if ($_SESSION["profile"] == $line["id"]) {
+				$is_active = __("(active)");
+			} else {
+				$is_active = "";
+			}
+
+			print "<td><span dojoType=\"dijit.InlineEditBox\"
+				width=\"300px\" autoSave=\"false\"
+				profile-id=\"$profile_id\">" . $edit_title .
+				"<script type=\"dojo/method\" event=\"onChange\" args=\"item\">
+					var elem = this;
+					dojo.xhrPost({
+						url: 'backend.php',
+						content: {op: 'rpc', method: 'saveprofile',
+							value: this.value,
+							id: this.srcNodeRef.getAttribute('profile-id')},
+							load: function(response) {
+								elem.attr('value', response);
+						}
+					});
+				</script>
+			</span> $is_active</td>";
+
+			print "</tr>";
+
+			++$lnum;
+		}
+
+		print "</table>";
+		print "</form>";
+		print "</div>";
+
+		print "<div class='dlgButtons'>
+			<div style='float : left'>
+			<button dojoType=\"dijit.form.Button\" onclick=\"dijit.byId('profileEditDlg').removeSelected()\">".
+			__('Remove selected profiles')."</button>
+			<button dojoType=\"dijit.form.Button\" onclick=\"dijit.byId('profileEditDlg').activateProfile()\">".
+			__('Activate profile')."</button>
+			</div>";
+
+		print "<button dojoType=\"dijit.form.Button\" onclick=\"dijit.byId('profileEditDlg').hide()\">".
+			__('Close this window')."</button>";
+		print "</div>";
+
+	}
+
+	private function getShortDesc($pref_name) {
+		if (isset($this->pref_help[$pref_name])) {
+			return $this->pref_help[$pref_name][0];
+		}
+		return "";
+	}
+
+	private function getHelpText($pref_name) {
+		if (isset($this->pref_help[$pref_name])) {
+			return $this->pref_help[$pref_name][1];
+		}
+		return "";
+	}
+
+	private function getSectionName($id) {
+		if (isset($this->pref_sections[$id])) {
+			return $this->pref_sections[$id];
+		}
+
+		return "";
 	}
 }
 ?>

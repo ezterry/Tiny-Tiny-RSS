@@ -31,13 +31,14 @@
 			"quiet",
 			"log:",
 			"indexes",
+			"update-schema",
 			"convert-filters",
 			"force-update",
 			"list-plugins",
 			"help");
 
 	foreach ($pluginhost->get_commands() as $command => $data) {
-		array_push($longopts, $command);
+		array_push($longopts, $command . $data["suffix"]);
 	}
 
 	$options = getopt("", $longopts);
@@ -51,7 +52,7 @@
 		</head>
 
 		<body>
-		<div class="floatingLogo"><img src="images/logo_wide.png"></div>
+		<div class="floatingLogo"><img src="images/logo_small.png"></div>
 		<h1><?php echo __("Tiny Tiny RSS data update script.") ?></h1>
 
 		<?php print_error("Please run this script from the command line. Use option \"-help\" to display command help if this error is displayed erroneously."); ?>
@@ -72,6 +73,7 @@
 		print "  --quiet              - don't output messages to stdout\n";
 		print "  --log FILE           - log messages to FILE\n";
 		print "  --indexes            - recreate missing schema indexes\n";
+		print "  --update-schema      - update database schema\n";
 		print "  --convert-filters    - convert type1 filters to type2\n";
 		print "  --force-update       - force update of all feeds\n";
 		print "  --list-plugins       - list all available plugins\n";
@@ -79,7 +81,8 @@
 		print "Plugin options:\n";
 
 		foreach ($pluginhost->get_commands() as $command => $data) {
-			printf("  --%-19s - %s\n", "$command", $data["description"]);
+			$args = $data['arghelp'];
+			printf(" --%-19s - %s\n", "$command $args", $data["description"]);
 		}
 
 		return;
@@ -144,7 +147,9 @@
 
 	if (isset($options["daemon"])) {
 		while (true) {
-			passthru(PHP_EXECUTABLE . " " . $argv[0] ." --daemon-loop");
+			$quiet = (isset($options["quiet"])) ? "--quiet" : "";
+
+			passthru(PHP_EXECUTABLE . " " . $argv[0] ." --daemon-loop $quiet");
 			_debug("Sleeping for " . DAEMON_SLEEP_INTERVAL . " seconds...");
 			sleep(DAEMON_SLEEP_INTERVAL);
 		}
@@ -152,7 +157,7 @@
 
 	if (isset($options["daemon-loop"])) {
 		if (!make_stampfile('update_daemon.stamp')) {
-			die("error: unable to create stampfile\n");
+			_debug("warning: unable to create stampfile\n");
 		}
 
 		// Call to the feed batch update function
@@ -287,6 +292,35 @@
 
 	}
 
+	if (isset($options["update-schema"])) {
+		_debug("checking for updates (" . DB_TYPE . ")...");
+
+		$updater = new DbUpdater($link, DB_TYPE, SCHEMA_VERSION);
+
+		if ($updater->isUpdateRequired()) {
+			_debug("schema update required, version " . $updater->getSchemaVersion() . " to " . SCHEMA_VERSION);
+			_debug("WARNING: please backup your database before continuing.");
+			_debug("Type 'yes' to continue.");
+
+			if (read_stdin() != 'yes')
+				exit;
+
+			for ($i = $updater->getSchemaVersion() + 1; $i <= SCHEMA_VERSION; $i++) {
+				_debug("performing update up to version $i...");
+
+				$result = $updater->performUpdateTo($i);
+
+				_debug($result ? "OK!" : "FAILED!");
+
+				if (!$result) return;
+
+			}
+		} else {
+			_debug("update not required.");
+		}
+
+	}
+
 	if (isset($options["list-plugins"])) {
 		$tmppluginhost = new PluginHost($link);
 		$tmppluginhost->load_all($tmppluginhost::KIND_ALL);
@@ -319,4 +353,4 @@
 
 	if (file_exists(LOCK_DIRECTORY . "/$lock_filename"))
 		unlink(LOCK_DIRECTORY . "/$lock_filename");
-?>
+g?>

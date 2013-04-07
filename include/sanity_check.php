@@ -1,6 +1,25 @@
 <?php
-	// WARNING: Don't ask for help on tt-rss.org forums or the bugtracker if you have
-	// modified this file.
+	/*
+	 * WARNING!
+	 *
+	 * If you modify this file, you are ON YOUR OWN!
+	 *
+	 * Believe it or not, all of the checks below are required to succeed for
+	 * tt-rss to actually function properly.
+	 *
+	 * If you think you have a better idea about what is or isn't required, feel
+	 * free to modify the file, note though that you are therefore automatically
+	 * disqualified from any further support by official channels, e.g. tt-rss.org
+	 * issue tracker or the forums.
+	 *
+	 * If you come crying when stuff inevitably breaks, you will be mocked and told
+	 * to get out. */
+
+	function make_self_url_path() {
+		$url_path = ($_SERVER['HTTPS'] != "on" ? 'http://' :  'https://') . $_SERVER["HTTP_HOST"] . parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
+
+		return $url_path;
+	}
 
 	function initial_sanity_check($link) {
 
@@ -11,6 +30,10 @@
 		} else {
 
 			require_once "sanity_config.php";
+
+			if (file_exists("install") && !file_exists("config.php")) {
+				array_push($errors, "Please copy config.php-dist to config.php or run the installer in install/");
+			}
 
 			if (strpos(PLUGINS, "auth_") === FALSE) {
 				array_push($errors, "Please enable at least one authentication module via PLUGINS constant in config.php");
@@ -52,14 +75,6 @@
 				}
 			}
 
-			if (SESSION_EXPIRE_TIME < 60) {
-				array_push($errors, "SESSION_EXPIRE_TIME set in config.php is too low, please set it to an integer value >= 60");
-			}
-
-			if (SESSION_EXPIRE_TIME < SESSION_COOKIE_LIFETIME) {
-				array_push($errors, "SESSION_EXPIRE_TIME set in config.php should be >= to SESSION_COOKIE_LIFETIME");
-			}
-
 			if (SINGLE_USER_MODE) {
 				$link = db_connect(DB_HOST, DB_USER, DB_PASS, DB_NAME);
 
@@ -73,12 +88,10 @@
 			}
 
 			if (SELF_URL_PATH == "http://yourserver/tt-rss/") {
-				if ($_SERVER['HTTP_REFERER']) {
-					array_push($errors,
-						"Please set SELF_URL_PATH to the correct value for your server (possible value: <b>" . $_SERVER['HTTP_REFERER'] . "</b>)");
-				} else {
-					array_push($errors, "Please set SELF_URL_PATH to the correct value for your server.");
-				}
+				$urlpath = preg_replace("/\w+\.php$/", "", make_self_url_path());
+
+				array_push($errors,
+						"Please set SELF_URL_PATH to the correct value for your server (possible value: <b>$urlpath</b>)");
 			}
 
 			if (!is_writable(ICONS_DIR)) {
@@ -146,7 +159,8 @@
 				<link rel="stylesheet" type="text/css" href="utility.css">
 			</head>
 		<body>
-		<div class="floatingLogo"><img src="images/logo_wide.png"></div>
+		<div class="floatingLogo"><img src="images/logo_small.png"></div>
+			<div class="content">
 
 			<h1>Startup failed</h1>
 
@@ -158,6 +172,8 @@
 			<p>You might want to check tt-rss <a href="http://tt-rss.org/wiki">wiki</a> or the
 				<a href="http://tt-rss.org/forum">forums</a> for more information. Please search the forums before creating new topic
 				for your question.</p>
+
+		</div>
 		</body>
 		</html>
 

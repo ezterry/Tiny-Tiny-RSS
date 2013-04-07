@@ -11,11 +11,14 @@
 	chdir("..");
 
 	define('TTRSS_SESSION_NAME', 'ttrss_api_sid');
+	define('NO_SESSION_AUTOSTART', true);
 
 	require_once "db.php";
 	require_once "db-prefs.php";
 	require_once "functions.php";
 	require_once "sessions.php";
+
+	ini_set("session.gc_maxlifetime", 86400);
 
 	define('AUTH_DISABLE_OTP', true);
 
@@ -46,9 +49,10 @@
 
 	if ($_REQUEST["sid"]) {
 		session_id($_REQUEST["sid"]);
+		@session_start();
+	} else if (defined('_API_DEBUG_HTTP_ENABLED')) {
+		@session_start();
 	}
-
-	@session_start();
 
 	if (!init_connection($link)) return;
 

@@ -122,7 +122,7 @@ function init() {
 
 function fetchProfiles() {
 	try {
-		var query = "?op=getProfiles&login=" + param_escape(document.forms["loginForm"].login.value);
+		var query = "op=getProfiles&login=" + param_escape(document.forms["loginForm"].login.value);
 
 		if (query) {
 			new Ajax.Request("public.php",	{
@@ -220,6 +220,16 @@ function bwLimitChange(elem) {
 				onchange="bwLimitChange(this)">
 			<label style='display : inline' for="bw_limit"><?php echo __("Use less traffic") ?></label>
 		</div>
+
+		<?php if (SESSION_COOKIE_LIFETIME > 0) { ?>
+
+		<div class="row">
+			<label>&nbsp;</label>
+			<input dojoType="dijit.form.CheckBox" name="remember_me" id="remember_me" type="checkbox">
+			<label style='display : inline' for="remember_me"><?php echo __("Remember me") ?></label>
+		</div>
+
+		<?php } ?>
 
 		<div class="row" style='text-align : right'>
 			<button dojoType="dijit.form.Button" type="submit"><?php echo __('Log in') ?></button>

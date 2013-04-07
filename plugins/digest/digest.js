@@ -2,6 +2,7 @@ var last_feeds = [];
 var init_params = {};
 var hotkeys_map = false;
 var hotkey_prefix = false;
+var mobile_mode = false;
 
 var _active_feed_id = false;
 var _update_timeout = false;
@@ -28,7 +29,7 @@ function catchup_feed(feed_id, callback) {
 
 			if (feed_id < 0) is_cat = "true"; // KLUDGE
 
-			var query = "?op=rpc&method=catchupFeed&feed_id=" +
+			var query = "op=rpc&method=catchupFeed&feed_id=" +
 				feed_id + "&is_cat=" + is_cat;
 
 			new Ajax.Request("backend.php",	{
@@ -68,9 +69,9 @@ function catchup_visible_articles(callback) {
 
 		var ids = get_visible_article_ids();
 
-		if (confirm(__("Mark %d displayed articles as read?").replace("%d", ids.length))) {
+		if (confirm(ngettext("Mark %d displayed article as read?", "Mark %d displayed articles as read?", ids.length).replace("%d", ids.length))) {
 
-			var query = "?op=rpc&method=catchupSelected" +
+			var query = "op=rpc&method=catchupSelected" +
 				"&cmode=0&ids=" + param_escape(ids);
 
 			new Ajax.Request("backend.php",	{
@@ -90,7 +91,7 @@ function catchup_visible_articles(callback) {
 
 function catchup_article(article_id, callback) {
 	try {
-		var query = "?op=rpc&method=catchupSelected" +
+		var query = "op=rpc&method=catchupSelected" +
 			"&cmode=0&ids=" + article_id;
 
 		new Ajax.Request("backend.php",	{
@@ -122,7 +123,7 @@ function set_selected_article(article_id) {
 		});
 
 	} catch (e) {
-		exception_error("mark_selected_feed", e);
+		exception_error("set_selected_article", e);
 	}
 }
 
@@ -141,7 +142,7 @@ function set_selected_feed(feed_id) {
 		_active_feed_id = feed_id;
 
 	} catch (e) {
-		exception_error("mark_selected_feed", e);
+		exception_error("set_selected_feed", e);
 	}
 }
 
@@ -171,7 +172,7 @@ function update(callback) {
 		window.clearTimeout(_update_timeout);
 
 		new Ajax.Request("backend.php",	{
-			parameters: "?op=digest&method=digestinit",
+			parameters: "op=digest&method=digestinit",
 			onComplete: function(transport) {
 				fatal_error_check(transport);
 				parse_feeds(transport);
@@ -222,7 +223,7 @@ function view(article_id) {
 			}, 500);
 
 		new Ajax.Request("backend.php",	{
-			parameters: "?op=digest&method=digestgetcontents&article_id=" +
+			parameters: "op=digest&method=digestgetcontents&article_id=" +
 				article_id,
 			onComplete: function(transport) {
 				fatal_error_check(transport);
@@ -298,6 +299,20 @@ function view(article_id) {
 	}
 }
 
+function close_feed() {
+	$("headlines").removeClassName("move");
+
+	if (mobile_mode) set_selected_feed(false);
+}
+
+function go_back() {
+	if ($("article").hasClassName("visible")) {
+		close_article();
+	} else {
+		close_feed();
+	}
+}
+
 function close_article() {
 	$("content").removeClassName("move");
 	$("article").removeClassName("visible");
@@ -305,6 +320,8 @@ function close_article() {
 
 function viewfeed(feed_id, offset, replace, no_effects, no_indicator, callback) {
 	try {
+
+		$("headlines").addClassName("move");
 
 		if (!feed_id) feed_id = _active_feed_id;
 		if (offset == undefined) offset = 0;
@@ -314,7 +331,7 @@ function viewfeed(feed_id, offset, replace, no_effects, no_indicator, callback) 
 
 		if (!offset) $("headlines").scrollTop = 0;
 
-		var query = "backend.php?op=digest&method=digestupdate&feed_id=" +
+		var query = "op=digest&method=digestupdate&feed_id=" +
 				param_escape(feed_id) +	"&offset=" + offset +
 				"&seq=" + _update_seq;
 
@@ -515,7 +532,7 @@ function redraw_feedlist(feeds) {
 			$('feeds-content').innerHTML += "<li id='F-MORE-PROMPT'>" +
 				"<img src='images/blank_icon.gif'>" +
 				"<a href=\"#\" onclick=\"expand_feeds()\">" +
-				__("%d more...").replace("%d", feeds.length-10) +
+				ngettext("%d more...", "%d more...", feeds.length-10).replace("%d", feeds.length-10) +
 				"</a>" + "</li>";
 		}
 
@@ -652,24 +669,27 @@ function parse_headlines(transport, replace, no_effects) {
 function init_second_stage() {
 	try {
 		new Ajax.Request("backend.php",	{
-			parameters: "backend.php?op=digest&method=digestinit&init=1",
+			parameters: "op=digest&method=digestinit&init=1",
 			onComplete: function(transport) {
 				parse_feeds(transport);
 				Element.hide("overlay");
 
 				document.onkeydown = hotkey_handler;
 
-				window.setTimeout('viewfeed(-4)', 100);
-				_update_timeout = window.setTimeout('update()', 5*1000);
-				} });
+				if (!mobile_mode)
+					window.setTimeout('viewfeed(-4)', 100);
+					_update_timeout = window.setTimeout('update()', 5*1000);
+					} });
 
 	} catch (e) {
 		exception_error("init_second_stage", e);
 	}
 }
 
-function init() {
+function init(mobile) {
 	try {
+		mobile_mode = mobile;
+
 		new Ajax.Request("backend.php", {
 			parameters: {op: "rpc", method: "sanityCheck"},
 			onComplete: function(transport) {
@@ -685,7 +705,7 @@ function toggle_mark(img, id) {
 
 	try {
 
-		var query = "?op=rpc&id=" + id + "&method=mark";
+		var query = "op=rpc&id=" + id + "&method=mark";
 
 		if (!img) return;
 
@@ -714,7 +734,7 @@ function toggle_pub(img, id, note) {
 
 	try {
 
-		var query = "?op=rpc&id=" + id + "&method=publ";
+		var query = "op=rpc&id=" + id + "&method=publ";
 
 		if (note != undefined) {
 			query = query + "&note=" + param_escape(note);
@@ -752,7 +772,7 @@ function fatal_error(code, msg) {
 		if (code == 6) {
 			window.location.href = "digest.php";
 		} else if (code == 5) {
-			window.location.href = "db-updater.php";
+			window.location.href = "public.php?op=dbupdate";
 		} else {
 
 			if (msg == "") msg = "Unknown error";
@@ -858,7 +878,7 @@ function hotkey_handler(e) {
 
 		switch (keycode) {
 		case 27: // esc
-			close_article();
+			go_back();
 			return false;
 		}
 

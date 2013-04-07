@@ -42,7 +42,7 @@ class Updater extends Plugin {
 			case 0:
 				array_push($log, "Work directory: $work_dir");
 
-				if (!is_writable($work_dir) && !is_writable("$parent_dir")) {
+				if (!is_writable($work_dir) || !is_writable("$parent_dir")) {
 					$user = posix_getpwuid(posix_geteuid());
 					$user = $user["name"];
 					array_push($log, "Both tt-rss and parent directories should be writable as current user ($user).");
@@ -58,6 +58,10 @@ class Updater extends Plugin {
 					array_push($log, "System temporary directory should be writable as current user.");
 					$stop = true; break;
 				}
+
+				// bah, also humbug
+				putenv("PATH=" . getenv("PATH") . PATH_SEPARATOR . "/bin" .
+					PATH_SEPARATOR . "/usr/bin");
 
 				array_push($log, "Checking for tar...");
 
@@ -240,6 +244,26 @@ class Updater extends Plugin {
 					chmod($dir, 0777);
 				}
 
+				if (ICONS_DIR == "feed-icons") {
+					array_push($log, "Migrating feed icons...");
+
+					$icons = glob("$old_dir/feed-icons/*.ico");
+					$icons_copied = 0;
+
+					foreach ($icons as $icon) {
+						$icon = basename($icon);
+
+						if (copy("$old_dir/feed-icons/$icon", "$work_dir/feed-icons/$icon")) {
+							++$icons_copied;
+						}
+					}
+
+					array_push($log, "Done; $icons_copied files copied");
+
+				} else {
+					array_push($log, "Not migrating feed icons, ICONS_DIR modified.");
+				}
+
 				array_push($log, "Upgrade completed.");
 				array_push($log, "Your old tt-rss directory is saved at $old_dir. ".
 					"Please migrate locally modified files (if any) and remove it.");
@@ -278,10 +302,12 @@ class Updater extends Plugin {
 		_debug("Please backup your tt-rss directory before continuing. Your database will not be modified.");
 		_debug("Type 'yes' to continue.");
 
-		if (read_stdin() != 'yes')
+		$input = read_stdin();
+
+		if ($input != 'yes' && $input != 'force')
 			exit;
 
-		$this->update_self_cli($link, in_array("-force", $args));
+		$this->update_self_cli($link, $input == 'force');
 	}
 
 	function get_prefs_js() {
@@ -301,9 +327,14 @@ class Updater extends Plugin {
 
 			if (is_array($_SESSION["version_data"])) {
 				$version = $_SESSION["version_data"]["version"];
+				$version_id = $_SESSION["version_data"]["version_id"];
 				print_notice(T_sprintf("New version of Tiny Tiny RSS is available (%s).", "<b>$version</b>"));
 
-				print "<p><button dojoType=\"dijit.form.Button\" onclick=\"return updateSelf()\">".
+				$details = "http://tt-rss.org/redmine/versions/$version_id";
+
+				print "<p><button onclick=\"window.open('$details')\" dojoType=\"dijit.form.Button\">".__("See the release notes")."</button>";
+
+				print " <button dojoType=\"dijit.form.Button\" onclick=\"return updateSelf()\">".
 					__('Update Tiny Tiny RSS')."</button></p>";
 
 			} else {
