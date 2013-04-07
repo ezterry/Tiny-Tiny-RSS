@@ -5,6 +5,7 @@ RewriteRule ^.gitignore - [R=404,L]
 RewriteRule ^config.php - [R=404,L]
 RewriteRule ^update - [R=404,L]
 RewriteRule ^utils  - [R=404,L]
+RewriteRule ^install - [R=404,L]
 
 #may need to be commented for db update
 RewriteRule ^db-updater.php - [R=404,L]
