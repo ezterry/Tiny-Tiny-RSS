@@ -282,11 +282,27 @@ function init() {
 		hotkey_actions["prev_article_noscroll"] = function() {
 				moveToPost('prev', true);
 		};
+		hotkey_actions["next_article_noexpand"] = function() {
+				moveToPost('next', true, true);
+		};
+		hotkey_actions["prev_article_noexpand"] = function() {
+				moveToPost('prev', true, true);
+		};
 		hotkey_actions["collapse_article"] = function() {
 				var id = getActiveArticleId();
 				var elem = $("CICD-"+id);
 				if(elem.visible()) {
 					cdmCollapseArticle(null, id);
+				}
+				else {
+					cdmExpandArticle(id);
+				}
+		};
+		hotkey_actions["toggle_expand"] = function() {
+				var id = getActiveArticleId();
+				var elem = $("CICD-"+id);
+				if(elem.visible()) {
+					cdmUnexpandArticle(null, id);
 				}
 				else {
 					cdmExpandArticle(id);
@@ -436,11 +452,17 @@ function init() {
 		hotkey_actions["select_article_cursor"] = function() {
 				var id = getArticleUnderPointer();
 				if (id) {
-					var cb = dijit.byId("RCHK-" + id);
-					if (cb) {
-						cb.attr("checked", !cb.attr("checked"));
-						toggleSelectRowById(cb, "RROW-" + id);
-						return false;
+					var row = $("RROW-" + id);
+
+					if (row) {
+						var cb = dijit.getEnclosingWidget(
+							row.getElementsByClassName("rchk")[0]);
+
+						if (cb) {
+							cb.attr("checked", !cb.attr("checked"));
+							toggleSelectRowById(cb, "RROW-" + id);
+							return false;
+						}
 					}
 				}
 		};
