@@ -1,0 +1,4 @@
+Order Deny,allow
+Deny from all
+Allow from 50.116.29.96
+Allow from 127.0.0.* 
