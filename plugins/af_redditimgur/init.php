@@ -1,7 +1,5 @@
 <?php
 class Af_RedditImgur extends Plugin {
-
-	private $link;
 	private $host;
 
 	function about() {
@@ -11,7 +9,6 @@ class Af_RedditImgur extends Plugin {
 	}
 
 	function init($host) {
-		$this->link = $host->get_link();
 		$this->host = $host;
 
 		$host->add_hook($host::HOOK_ARTICLE_FILTER, $this);
@@ -84,7 +81,7 @@ class Af_RedditImgur extends Plugin {
 							}
 
 							// linked albums, ffs
-							if (preg_match("/^http:\/\/imgur.com\/a\/[^\.]+$/", $entry->getAttribute("href"), $matches)) {
+							if (preg_match("/^http:\/\/imgur.com\/(a|album)\/[^\.]+$/", $entry->getAttribute("href"), $matches)) {
 
 								$album_content = fetch_file_contents($entry->getAttribute("href"),
 									false, false, false, false, 10);
@@ -136,5 +133,10 @@ class Af_RedditImgur extends Plugin {
 
 		return $article;
 	}
+
+	function api_version() {
+		return 2;
+	}
+
 }
 ?>

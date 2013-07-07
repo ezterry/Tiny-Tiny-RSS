@@ -1,6 +1,7 @@
 SET NAMES utf8;
 SET CHARACTER SET utf8;
 
+drop table if exists ttrss_error_log;
 drop table if exists ttrss_plugin_storage;
 drop table if exists ttrss_linked_feeds;
 drop table if exists ttrss_linked_instances;
@@ -13,6 +14,7 @@ drop table if exists ttrss_labels;
 drop table if exists ttrss_filters2_actions;
 drop table if exists ttrss_filters2_rules;
 drop table if exists ttrss_filters2;
+drop table if exists ttrss_filters;
 drop table if exists ttrss_filter_types;
 drop table if exists ttrss_filter_actions;
 drop table if exists ttrss_user_prefs;
@@ -108,6 +110,7 @@ create table ttrss_feeds (id integer not null auto_increment primary key,
 	purge_interval integer not null default 0,
 	last_updated datetime default 0,
 	last_error varchar(250) not null default '',
+	favicon_avg_color varchar(11) default null,
 	site_url varchar(250) not null default '',
 	auth_login varchar(250) not null default '',
 	auth_pass varchar(250) not null default '',
@@ -298,7 +301,7 @@ create table ttrss_tags (id integer primary key auto_increment,
 
 create table ttrss_version (schema_version int not null) ENGINE=InnoDB DEFAULT CHARSET=UTF8;
 
-insert into ttrss_version values (115);
+insert into ttrss_version values (121);
 
 create table ttrss_enclosures (id integer primary key auto_increment,
 	content_url text not null,
@@ -347,7 +350,7 @@ create index ttrss_prefs_pref_name_idx on ttrss_prefs(pref_name);
 insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('PURGE_OLD_DAYS', 3, '60', 1);
 insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('DEFAULT_UPDATE_INTERVAL', 3, '30', 1);
 insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('DEFAULT_ARTICLE_LIMIT', 3, '30', 2);
-insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('ALLOW_DUPLICATE_POSTS', 1, 'true', 1);
+insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('ALLOW_DUPLICATE_POSTS', 1, 'false', 1);
 insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('ENABLE_FEED_CATS', 1, 'true', 2);
 insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('SHOW_CONTENT_PREVIEW', 1, 'true', 2);
 insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('SHORT_DATE_FORMAT', 2, 'M d, G:i', 3);
@@ -383,7 +386,7 @@ insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('_MOBILE
 insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('_MOBILE_HIDE_READ', 1, 'false', 1);
 insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('_MOBILE_SORT_FEEDS_UNREAD', 1, 'false', 1);
 insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('_THEME_ID', 2, '0', 1);
-insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('USER_TIMEZONE', 2, 'UTC', 1);
+insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('USER_TIMEZONE', 2, 'Automatic', 1);
 insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('USER_STYLESHEET', 2, '', 2);
 insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('SORT_HEADLINES_BY_FEED_DATE', 1, 'false', 2);
 insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('_MOBILE_BROWSE_CATS', 1, 'true', 1);
@@ -391,10 +394,11 @@ insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('SSL_CER
 insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('DIGEST_PREFERRED_TIME', 2, '00:00', 4);
 insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('_PREFS_SHOW_EMPTY_CATS', 1, 'false', 1);
 insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('_DEFAULT_INCLUDE_CHILDREN', 1, 'false', 1);
-insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('AUTO_ASSIGN_LABELS', 1, 'true', 3);
+insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('AUTO_ASSIGN_LABELS', 1, 'false', 3);
 insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('_ENABLED_PLUGINS', 2, '', 1);
 insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('_MOBILE_REVERSE_HEADLINES', 1, 'false', 1);
 insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('USER_CSS_THEME', 2, '', 2);
+insert into ttrss_prefs (pref_name,type_id,def_value,section_id) values('USER_LANGUAGE', 2, '', 2);
 
 update ttrss_prefs set access_level = 1 where pref_name in ('ON_CATCHUP_SHOW_NEXT_FEED',
 	'SORT_HEADLINES_BY_FEED_DATE',
@@ -477,5 +481,15 @@ create table ttrss_plugin_storage (
 	content longtext not null,
   	foreign key (owner_uid) references ttrss_users(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=UTF8;
 
+create table ttrss_error_log(
+	id integer not null auto_increment primary key,
+	owner_uid integer,
+	errno integer not null,
+	errstr text not null,
+	filename text not null,
+	lineno integer not null,
+	context text not null,
+	created_at datetime not null,
+	foreign key (owner_uid) references ttrss_users(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=UTF8;
 
 commit;

@@ -12,7 +12,7 @@ class Pref_Users extends Handler_Protected {
 		}
 
 		function csrf_ignore($method) {
-			$csrf_ignored = array("index");
+			$csrf_ignored = array("index", "edit", "userdetails");
 
 			return array_search($method, $csrf_ignored) !== false;
 		}
@@ -21,7 +21,7 @@ class Pref_Users extends Handler_Protected {
 
 			$uid = sprintf("%d", $_REQUEST["id"]);
 
-			$result = db_query($this->link, "SELECT login,
+			$result = $this->dbh->query("SELECT login,
 				".SUBSTRING_FOR_DATE."(last_login,1,16) AS last_login,
 				access_level,
 				(SELECT COUNT(int_id) FROM ttrss_user_entries
@@ -30,33 +30,33 @@ class Pref_Users extends Handler_Protected {
 				FROM ttrss_users
 				WHERE id = '$uid'");
 
-			if (db_num_rows($result) == 0) {
+			if ($this->dbh->num_rows($result) == 0) {
 				print "<h1>".__('User not found')."</h1>";
 				return;
 			}
 
 			// print "<h1>User Details</h1>";
 
-			$login = db_fetch_result($result, 0, "login");
+			$login = $this->dbh->fetch_result($result, 0, "login");
 
 			print "<table width='100%'>";
 
-			$last_login = make_local_datetime($this->link,
-				db_fetch_result($result, 0, "last_login"), true);
+			$last_login = make_local_datetime(
+				$this->dbh->fetch_result($result, 0, "last_login"), true);
 
-			$created = make_local_datetime($this->link,
-				db_fetch_result($result, 0, "created"), true);
+			$created = make_local_datetime(
+				$this->dbh->fetch_result($result, 0, "created"), true);
 
-			$access_level = db_fetch_result($result, 0, "access_level");
-			$stored_articles = db_fetch_result($result, 0, "stored_articles");
+			$access_level = $this->dbh->fetch_result($result, 0, "access_level");
+			$stored_articles = $this->dbh->fetch_result($result, 0, "stored_articles");
 
 			print "<tr><td>".__('Registered')."</td><td>$created</td></tr>";
 			print "<tr><td>".__('Last logged in')."</td><td>$last_login</td></tr>";
 
-			$result = db_query($this->link, "SELECT COUNT(id) as num_feeds FROM ttrss_feeds
+			$result = $this->dbh->query("SELECT COUNT(id) as num_feeds FROM ttrss_feeds
 				WHERE owner_uid = '$uid'");
 
-			$num_feeds = db_fetch_result($result, 0, "num_feeds");
+			$num_feeds = $this->dbh->fetch_result($result, 0, "num_feeds");
 
 			print "<tr><td>".__('Subscribed feeds count')."</td><td>$num_feeds</td></tr>";
 
@@ -64,14 +64,12 @@ class Pref_Users extends Handler_Protected {
 
 			print "<h1>".__('Subscribed feeds')."</h1>";
 
-			$result = db_query($this->link, "SELECT id,title,site_url FROM ttrss_feeds
+			$result = $this->dbh->query("SELECT id,title,site_url FROM ttrss_feeds
 				WHERE owner_uid = '$uid' ORDER BY title");
 
 			print "<ul class=\"userFeedList\">";
 
-			$row_class = "odd";
-
-			while ($line = db_fetch_assoc($result)) {
+			while ($line = $this->dbh->fetch_assoc($result)) {
 
 				$icon_file = ICONS_URL."/".$line["id"].".ico";
 
@@ -81,13 +79,11 @@ class Pref_Users extends Handler_Protected {
 					$feed_icon = "<img class=\"tinyFeedIcon\" src=\"images/blank_icon.gif\">";
 				}
 
-				print "<li class=\"$row_class\">$feed_icon&nbsp;<a href=\"".$line["site_url"]."\">".$line["title"]."</a></li>";
-
-				$row_class = $row_class == "even" ? "odd" : "even";
+				print "<li>$feed_icon&nbsp;<a href=\"".$line["site_url"]."\">".$line["title"]."</a></li>";
 
 			}
 
-			if (db_num_rows($result) < $num_feeds) {
+			if ($this->dbh->num_rows($result) < $num_feeds) {
 				// FIXME - add link to show ALL subscribed feeds here somewhere
 				print "<li><img
 					class=\"tinyFeedIcon\" src=\"images/blank_icon.gif\">&nbsp;...</li>";
@@ -96,7 +92,7 @@ class Pref_Users extends Handler_Protected {
 			print "</ul>";
 
 			print "<div align='center'>
-				<button onclick=\"closeInfoBox()\">".__("Close this window").
+				<button dojoType=\"dijit.form.Button\" type=\"submit\">".__("Close this window").
 				"</button></div>";
 
 			return;
@@ -105,18 +101,18 @@ class Pref_Users extends Handler_Protected {
 		function edit() {
 			global $access_level_names;
 
-			$id = db_escape_string($this->link, $_REQUEST["id"]);
-			print "<form id=\"user_edit_form\" onsubmit='return false'>";
+			$id = $this->dbh->escape_string($_REQUEST["id"]);
+			print "<form id=\"user_edit_form\" onsubmit='return false' dojoType=\"dijit.form.Form\">";
 
-			print "<input type=\"hidden\" name=\"id\" value=\"$id\">";
-			print "<input type=\"hidden\" name=\"op\" value=\"pref-users\">";
-			print "<input type=\"hidden\" name=\"method\" value=\"editSave\">";
+			print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"id\" value=\"$id\">";
+			print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"op\" value=\"pref-users\">";
+			print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"method\" value=\"editSave\">";
 
-			$result = db_query($this->link, "SELECT * FROM ttrss_users WHERE id = '$id'");
+			$result = $this->dbh->query("SELECT * FROM ttrss_users WHERE id = '$id'");
 
-			$login = db_fetch_result($result, 0, "login");
-			$access_level = db_fetch_result($result, 0, "access_level");
-			$email = db_fetch_result($result, 0, "email");
+			$login = $this->dbh->fetch_result($result, 0, "login");
+			$access_level = $this->dbh->fetch_result($result, 0, "access_level");
+			$email = $this->dbh->fetch_result($result, 0, "email");
 
 			$sel_disabled = ($id == $_SESSION["uid"]) ? "disabled" : "";
 
@@ -124,15 +120,13 @@ class Pref_Users extends Handler_Protected {
 			print "<div class=\"dlgSecCont\">";
 
 			if ($sel_disabled) {
-				print "<input type=\"hidden\" name=\"login\" value=\"$login\">";
-				print "<input size=\"30\" style=\"font-size : 16px\"
-					onkeypress=\"return filterCR(event, userEditSave)\" $sel_disabled
-					value=\"$login\">";
-			} else {
-				print "<input size=\"30\" style=\"font-size : 16px\"
-					onkeypress=\"return filterCR(event, userEditSave)\" $sel_disabled
-					name=\"login\" value=\"$login\">";
+				print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"login\" value=\"$login\">";
 			}
+
+			print "<input size=\"30\" style=\"font-size : 16px\"
+				dojoType=\"dijit.form.ValidationTextBox\" required=\"1\"
+				onkeypress=\"return filterCR(event, userEditSave)\" $sel_disabled
+				name=\"login\" value=\"$login\">";
 
 			print "</div>";
 
@@ -143,17 +137,16 @@ class Pref_Users extends Handler_Protected {
 
 			if (!$sel_disabled) {
 				print_select_hash("access_level", $access_level, $access_level_names,
-					$sel_disabled);
+					"dojoType=\"dijit.form.Select\" $sel_disabled");
 			} else {
 				print_select_hash("", $access_level, $access_level_names,
-					$sel_disabled);
-				print "<input type=\"hidden\" name=\"access_level\" value=\"$access_level\">";
+					"dojoType=\"dijit.form.Select\" $sel_disabled");
+				print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"access_level\" value=\"$access_level\">";
 			}
 
-			print "<br/>";
+			print "<hr/>";
 
-			print __('Change password to') .
-				" <input type=\"password\" size=\"20\" onkeypress=\"return filterCR(event, userEditSave)\"
+			print "<input dojoType=\"dijit.form.TextBox\" type=\"password\" size=\"20\" onkeypress=\"return filterCR(event, userEditSave)\" placeholder=\"Change password\"
 				name=\"password\">";
 
 			print "</div>";
@@ -161,8 +154,7 @@ class Pref_Users extends Handler_Protected {
 			print "<div class=\"dlgSec\">".__("Options")."</div>";
 			print "<div class=\"dlgSecCont\">";
 
-			print __('E-mail: ').
-				" <input size=\"30\" name=\"email\" onkeypress=\"return filterCR(event, userEditSave)\"
+			print "<input dojoType=\"dijit.form.TextBox\" size=\"30\" name=\"email\" onkeypress=\"return filterCR(event, userEditSave)\" placeholder=\"E-mail\"
 				value=\"$email\">";
 
 			print "</div>";
@@ -172,19 +164,19 @@ class Pref_Users extends Handler_Protected {
 			print "</form>";
 
 			print "<div class=\"dlgButtons\">
-				<button onclick=\"return userEditSave()\">".
+				<button dojoType=\"dijit.form.Button\" type=\"submit\">".
 					__('Save')."</button>
-				<button onclick=\"return userEditCancel()\">".
+				<button dojoType=\"dijit.form.Button\" onclick=\"dijit.byId('userEditDlg').hide()\">".
 					__('Cancel')."</button></div>";
 
 			return;
 		}
 
 		function editSave() {
-			$login = db_escape_string($this->link, trim($_REQUEST["login"]));
-			$uid = db_escape_string($this->link, $_REQUEST["id"]);
+			$login = $this->dbh->escape_string(trim($_REQUEST["login"]));
+			$uid = $this->dbh->escape_string($_REQUEST["id"]);
 			$access_level = (int) $_REQUEST["access_level"];
-			$email = db_escape_string($this->link, trim($_REQUEST["email"]));
+			$email = $this->dbh->escape_string(trim($_REQUEST["email"]));
 			$password = $_REQUEST["password"];
 
 			if ($password) {
@@ -195,52 +187,52 @@ class Pref_Users extends Handler_Protected {
 				$pass_query_part = "";
 			}
 
-			db_query($this->link, "UPDATE ttrss_users SET $pass_query_part login = '$login',
+			$this->dbh->query("UPDATE ttrss_users SET $pass_query_part login = '$login',
 				access_level = '$access_level', email = '$email', otp_enabled = false
 				WHERE id = '$uid'");
 
 		}
 
 		function remove() {
-			$ids = split(",", db_escape_string($this->link, $_REQUEST["ids"]));
+			$ids = explode(",", $this->dbh->escape_string($_REQUEST["ids"]));
 
 			foreach ($ids as $id) {
 				if ($id != $_SESSION["uid"] && $id != 1) {
-					db_query($this->link, "DELETE FROM ttrss_tags WHERE owner_uid = '$id'");
-					db_query($this->link, "DELETE FROM ttrss_feeds WHERE owner_uid = '$id'");
-					db_query($this->link, "DELETE FROM ttrss_users WHERE id = '$id'");
+					$this->dbh->query("DELETE FROM ttrss_tags WHERE owner_uid = '$id'");
+					$this->dbh->query("DELETE FROM ttrss_feeds WHERE owner_uid = '$id'");
+					$this->dbh->query("DELETE FROM ttrss_users WHERE id = '$id'");
 				}
 			}
 		}
 
 		function add() {
 
-			$login = db_escape_string($this->link, trim($_REQUEST["login"]));
+			$login = $this->dbh->escape_string(trim($_REQUEST["login"]));
 			$tmp_user_pwd = make_password(8);
 			$salt = substr(bin2hex(get_random_bytes(125)), 0, 250);
 			$pwd_hash = encrypt_password($tmp_user_pwd, $salt, true);
 
-			$result = db_query($this->link, "SELECT id FROM ttrss_users WHERE
+			$result = $this->dbh->query("SELECT id FROM ttrss_users WHERE
 				login = '$login'");
 
-			if (db_num_rows($result) == 0) {
+			if ($this->dbh->num_rows($result) == 0) {
 
-				db_query($this->link, "INSERT INTO ttrss_users
+				$this->dbh->query("INSERT INTO ttrss_users
 					(login,pwd_hash,access_level,last_login,created, salt)
 					VALUES ('$login', '$pwd_hash', 0, null, NOW(), '$salt')");
 
 
-				$result = db_query($this->link, "SELECT id FROM ttrss_users WHERE
+				$result = $this->dbh->query("SELECT id FROM ttrss_users WHERE
 					login = '$login' AND pwd_hash = '$pwd_hash'");
 
-				if (db_num_rows($result) == 1) {
+				if ($this->dbh->num_rows($result) == 1) {
 
-					$new_uid = db_fetch_result($result, 0, "id");
+					$new_uid = $this->dbh->fetch_result($result, 0, "id");
 
 					print format_notice(T_sprintf("Added user <b>%s</b> with password <b>%s</b>",
 						$login, $tmp_user_pwd));
 
-					initialize_user($this->link, $new_uid);
+					initialize_user($new_uid);
 
 				} else {
 
@@ -252,9 +244,9 @@ class Pref_Users extends Handler_Protected {
 			}
 		}
 
-		static function resetUserPassword($link, $uid, $show_password) {
+		static function resetUserPassword($uid, $show_password) {
 
-			$result = db_query($link, "SELECT login,email
+			$result = db_query("SELECT login,email
 				FROM ttrss_users WHERE id = '$uid'");
 
 			$login = db_fetch_result($result, 0, "login");
@@ -266,7 +258,7 @@ class Pref_Users extends Handler_Protected {
 
 			$pwd_hash = encrypt_password($tmp_user_pwd, $new_salt, true);
 
-			db_query($link, "UPDATE ttrss_users SET pwd_hash = '$pwd_hash', salt = '$new_salt'
+			db_query("UPDATE ttrss_users SET pwd_hash = '$pwd_hash', salt = '$new_salt'
 				WHERE id = '$uid'");
 
 			if ($show_password) {
@@ -304,8 +296,8 @@ class Pref_Users extends Handler_Protected {
 		}
 
 		function resetPass() {
-			$uid = db_escape_string($this->link, $_REQUEST["id"]);
-			Pref_Users::resetUserPassword($this->link, $uid, true);
+			$uid = $this->dbh->escape_string($_REQUEST["id"]);
+			Pref_Users::resetUserPassword($uid, true);
 		}
 
 		function index() {
@@ -317,7 +309,7 @@ class Pref_Users extends Handler_Protected {
 
 			print "<div id=\"pref-user-toolbar\" dojoType=\"dijit.Toolbar\">";
 
-			$user_search = db_escape_string($this->link, $_REQUEST["search"]);
+			$user_search = $this->dbh->escape_string($_REQUEST["search"]);
 
 			if (array_key_exists("search", $_REQUEST)) {
 				$_SESSION["prefs_user_search"] = $user_search;
@@ -328,11 +320,11 @@ class Pref_Users extends Handler_Protected {
 			print "<div style='float : right; padding-right : 4px;'>
 				<input dojoType=\"dijit.form.TextBox\" id=\"user_search\" size=\"20\" type=\"search\"
 					value=\"$user_search\">
-				<button dojoType=\"dijit.form.Button\" onclick=\"javascript:updateUsersList()\">".
+				<button dojoType=\"dijit.form.Button\" onclick=\"updateUsersList()\">".
 					__('Search')."</button>
 				</div>";
 
-			$sort = db_escape_string($this->link, $_REQUEST["sort"]);
+			$sort = $this->dbh->escape_string($_REQUEST["sort"]);
 
 			if (!$sort || $sort == "undefined") {
 				$sort = "login";
@@ -347,17 +339,20 @@ class Pref_Users extends Handler_Protected {
 				dojoType=\"dijit.MenuItem\">".__('None')."</div>";
 			print "</div></div>";
 
-			print "<button dojoType=\"dijit.form.Button\" onclick=\"javascript:addUser()\">".__('Create user')."</button>";
+			print "<button dojoType=\"dijit.form.Button\" onclick=\"addUser()\">".__('Create user')."</button>";
 
 			print "
-				<button dojoType=\"dijit.form.Button\" onclick=\"javascript:selectedUserDetails()\">".
+				<button dojoType=\"dijit.form.Button\" onclick=\"selectedUserDetails()\">".
 				__('Details')."</button dojoType=\"dijit.form.Button\">
-				<button dojoType=\"dijit.form.Button\" onclick=\"javascript:editSelectedUser()\">".
+				<button dojoType=\"dijit.form.Button\" onclick=\"editSelectedUser()\">".
 				__('Edit')."</button dojoType=\"dijit.form.Button\">
-				<button dojoType=\"dijit.form.Button\" onclick=\"javascript:removeSelectedUsers()\">".
+				<button dojoType=\"dijit.form.Button\" onclick=\"removeSelectedUsers()\">".
 				__('Remove')."</button dojoType=\"dijit.form.Button\">
-				<button dojoType=\"dijit.form.Button\" onclick=\"javascript:resetSelectedUserPass()\">".
+				<button dojoType=\"dijit.form.Button\" onclick=\"resetSelectedUserPass()\">".
 				__('Reset password')."</button dojoType=\"dijit.form.Button\">";
+
+			PluginHost::getInstance()->run_hooks(PluginHost::HOOK_PREFS_TAB_SECTION,
+				"hook_prefs_tab_section", "prefUsersToolbar");
 
 			print "</div>"; #toolbar
 			print "</div>"; #pane
@@ -367,7 +362,7 @@ class Pref_Users extends Handler_Protected {
 
 			if ($user_search) {
 
-				$user_search = split(" ", $user_search);
+				$user_search = explode(" ", $user_search);
 				$tokens = array();
 
 				foreach ($user_search as $token) {
@@ -381,7 +376,7 @@ class Pref_Users extends Handler_Protected {
 				$user_search_query = "";
 			}
 
-			$result = db_query($this->link, "SELECT
+			$result = $this->dbh->query("SELECT
 					id,login,access_level,email,
 					".SUBSTRING_FOR_DATE."(last_login,1,16) as last_login,
 					".SUBSTRING_FOR_DATE."(created,1,16) as created
@@ -392,7 +387,7 @@ class Pref_Users extends Handler_Protected {
 					id > 0
 				ORDER BY $sort");
 
-			if (db_num_rows($result) > 0) {
+			if ($this->dbh->num_rows($result) > 0) {
 
 			print "<p><table width=\"100%\" cellspacing=\"0\"
 				class=\"prefUserList\" id=\"prefUserList\">";
@@ -406,9 +401,7 @@ class Pref_Users extends Handler_Protected {
 
 			$lnum = 0;
 
-			while ($line = db_fetch_assoc($result)) {
-
-				$class = ($lnum % 2) ? "even" : "odd";
+			while ($line = $this->dbh->fetch_assoc($result)) {
 
 				$uid = $line["id"];
 
@@ -416,8 +409,8 @@ class Pref_Users extends Handler_Protected {
 
 				$line["login"] = htmlspecialchars($line["login"]);
 
-				$line["created"] = make_local_datetime($this->link, $line["created"], false);
-				$line["last_login"] = make_local_datetime($this->link, $line["last_login"], false);
+				$line["created"] = make_local_datetime($line["created"], false);
+				$line["last_login"] = make_local_datetime($line["last_login"], false);
 
 				print "<td align='center'><input onclick='toggleSelectRow2(this);'
 					dojoType=\"dijit.form.CheckBox\" type=\"checkbox\"
@@ -453,8 +446,7 @@ class Pref_Users extends Handler_Protected {
 
 			print "</div>"; #pane
 
-			global $pluginhost;
-			$pluginhost->run_hooks($pluginhost::HOOK_PREFS_TAB,
+			PluginHost::getInstance()->run_hooks(PluginHost::HOOK_PREFS_TAB,
 				"hook_prefs_tab", "prefUsers");
 
 			print "</div>"; #container

@@ -2,6 +2,7 @@ var _infscroll_disable = 0;
 var _infscroll_request_sent = 0;
 var _search_query = false;
 var _viewfeed_last = 0;
+var _viewfeed_timeout = false;
 
 var counters_last_request = 0;
 
@@ -52,7 +53,7 @@ function loadMoreHeadlines() {
 }
 
 
-function viewfeed(feed, method, is_cat, offset, background, infscroll_req) {
+function viewfeed(feed, method, is_cat, offset, background, infscroll_req, can_wait) {
 	try {
 		if (is_cat == undefined)
 			is_cat = false;
@@ -132,14 +133,24 @@ function viewfeed(feed, method, is_cat, offset, background, infscroll_req) {
 
 		console.log(query);
 
+		if (can_wait && _viewfeed_timeout) {
+			setFeedExpandoIcon(getActiveFeedId(), activeFeedIsCat(), 'images/blank_icon.gif');
+			clearTimeout(_viewfeed_timeout);
+		}
+
 		setActiveFeedId(feed, is_cat);
 
-		new Ajax.Request("backend.php", {
-			parameters: query,
-			onComplete: function(transport) {
-				setFeedExpandoIcon(feed, is_cat, 'images/blank_icon.gif');
-				headlines_callback2(transport, offset, background, infscroll_req);
-			} });
+		timeout_ms = can_wait ? 250 : 0;
+		_viewfeed_timeout = setTimeout(function() {
+
+			new Ajax.Request("backend.php", {
+				parameters: query,
+				onComplete: function(transport) {
+					setFeedExpandoIcon(feed, is_cat, 'images/blank_icon.gif');
+					headlines_callback2(transport, offset, background, infscroll_req);
+					PluginHost.run(PluginHost.HOOK_FEED_LOADED, [feed, is_cat]);
+				} });
+		}, timeout_ms); // Wait 250ms
 
 	} catch (e) {
 		exception_error("viewfeed", e);
@@ -149,6 +160,8 @@ function viewfeed(feed, method, is_cat, offset, background, infscroll_req) {
 function feedlist_init() {
 	try {
 		console.log("in feedlist init");
+
+		loading_set_progress(50);
 
 		document.onkeydown = hotkey_handler;
 		setTimeout("hotkey_prefix_timeout()", 5*1000);
@@ -216,6 +229,7 @@ function parse_counters(elems, scheduled_call) {
 			var error = elems[l].error;
 			var has_img = elems[l].has_img;
 			var updated = elems[l].updated;
+			var auxctr = parseInt(elems[l].auxcounter);
 
 			if (id == "global-unread") {
 				global_unread = ctr;
@@ -233,6 +247,7 @@ function parse_counters(elems, scheduled_call) {
 			}
 
 			setFeedUnread(id, (kind == "cat"), ctr);
+			setFeedValue(id, (kind == "cat"), 'auxcounter', auxctr);
 
 			if (kind != "cat") {
 				setFeedValue(id, false, 'error', error);
@@ -415,7 +430,7 @@ function catchupFeed(feed, is_cat, mode) {
 		case "1week":
 			str = __("Mark all articles in %s older than 1 week as read?");
 			break;
-		case "2weeks":
+		case "2week":
 			str = __("Mark all articles in %s older than 2 weeks as read?");
 			break;
 		default:

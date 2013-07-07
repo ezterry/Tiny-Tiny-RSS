@@ -10,3 +10,6 @@ RewriteRule ^install - [R=404,L]
 #may need to be commented for db update
 RewriteRule ^db-updater.php - [R=404,L]
 
+AddType image/svg+xml svg
+AddType image/svg+xml svgz
+

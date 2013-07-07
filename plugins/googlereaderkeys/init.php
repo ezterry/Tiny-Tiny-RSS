@@ -1,7 +1,5 @@
 <?php
 class GoogleReaderKeys extends Plugin {
-
-	private $link;
 	private $host;
 
 	function about() {
@@ -11,7 +9,6 @@ class GoogleReaderKeys extends Plugin {
 	}
 
 	function init($host) {
-		$this->link = $host->get_link();
 		$this->host = $host;
 
 		$host->add_hook($host::HOOK_HOTKEY_MAP, $this);
@@ -26,12 +23,19 @@ class GoogleReaderKeys extends Plugin {
 		$hotkeys["v"]		= "open_in_new_window";
 		$hotkeys["r"]		= "feed_refresh";
 		$hotkeys["m"]		= "toggle_unread";
+		$hotkeys["o"]		= "toggle_expand";
+		$hotkeys["(13)|enter"]	= "toggle_expand";
+		$hotkeys["*(191)|?"]    = "help_dialog";
 		$hotkeys["(32)|space"]	= "next_article";
 		$hotkeys["(38)|up"]	= "article_scroll_up";
 		$hotkeys["(40)|down"]	= "article_scroll_down";
 
 		return $hotkeys;
-
 	}
+
+	function api_version() {
+		return 2;
+	}
+
 }
 ?>
